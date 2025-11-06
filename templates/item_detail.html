@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ item_display_name }} - 价格详情</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1200px;
+        }
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: bold;
+        }
+        .nav-tabs .nav-link.active {
+            background-color: #f8f9fa;
+            border-color: #dee2e6 #dee2e6 #f8f9fa;
+            font-weight: bold;
+        }
+        .chart-container {
+            height: 300px;
+            margin-bottom: 20px;
+        }
+        .data-table {
+            font-size: 0.9rem;
+        }
+        .data-table th {
+            background-color: #e9ecef;
+        }
+        .screenshot-container {
+            max-height: 400px;
+            overflow: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: white;
+        }
+        .screenshot-container img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+        .no-data {
+            text-align: center;
+            padding: 40px 0;
+            color: #6c757d;
+        }
+        .timestamp {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-top: 10px;
+        }
+        .latest-price {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        .latest-count {
+            font-size: 1rem;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5 mb-5">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3>{{ item_display_name }}</h3>
+                    <a href="/" class="btn btn-light btn-sm">返回列表</a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if data_types %}
+                    <ul class="nav nav-tabs mb-4">
+                        {% for data_type in data_types %}
+                            <li class="nav-item">
+                                <a class="nav-link {% if loop.first %}active{% endif %}" data-bs-toggle="tab" href="#{{ data_type }}">
+                                    {{ currency_types[data_type] }}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    
+                    <div class="tab-content">
+                        {% for data_type in data_types %}
+                            <div id="{{ data_type }}" class="tab-pane fade {% if loop.first %}show active{% endif %}">
+                                <!-- 空数据预警 -->
+                                {% if empty_timestamps[data_type] %}
+                                    <div class="card mb-4 bg-warning bg-opacity-10">
+                                        <div class="card-header bg-warning text-dark">
+                                            <strong>⚠️ 数据预警</strong>
+                                        </div>
+                                        <div class="card-body">
+                                            <p class="text-dark">以下时间点的数据全部为空，可能是截屏出现问题：</p>
+                                            <div class="mb-2">
+                                                {% for timestamp in empty_timestamps[data_type] %}
+                                                    <button type="button" class="btn btn-sm btn-outline-warning me-2 mb-2 view-empty-screenshot" 
+                                                            data-data-type="{{ data_type }}" data-timestamp="{{ timestamp }}">
+                                                        {{ timestamp }}
+                                                    </button>
+                                                {% endfor %}
+                                            </div>
+                                            <p class="text-dark text-sm">点击时间戳可查看对应截图进行检查</p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                
+                                <div class="row mb-4">
+                                    <div class="col-md-8">
+                                        <!-- 价格趋势图 -->
+                                        {% if charts[data_type] %}
+                                            <div class="card">
+                                                <div class="card-header">价格趋势图</div>
+                                                <div class="card-body">
+                                                    <img src="data:image/png;base64,{{ charts[data_type] }}" alt="价格趋势图" class="img-fluid">
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <div class="card">
+                                                <div class="card-body no-data">
+                                                    <p>暂无图表数据</p>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-4">
+                                        <!-- 可切换截图 -->
+                                        {% if screenshots[data_type] and screenshots[data_type]['timestamps'] %}
+                                            <div class="card">
+                                                <div class="card-header">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <span>历史截图</span>
+                                                        <div>
+                                                            <select id="{{ data_type }}-screenshot-select" class="form-select form-select-sm" style="width: auto;">
+                                                                {% for timestamp in screenshots[data_type]['timestamps'] %}
+                                                                    <option value="{{ timestamp }}" {% if loop.first %}selected{% endif %}>{{ timestamp }}</option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="card-body screenshot-container">
+                                                    <img id="{{ data_type }}-screenshot-image" 
+                                                         src="data:image/png;base64,{{ screenshots[data_type]['latest_image'] }}" 
+                                                         alt="截图 - {{ screenshots[data_type]['timestamps'][0] }}">
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <div class="card">
+                                                <div class="card-body no-data">
+                                                    <p>暂无截图</p>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <!-- 最新数据 -->
+                                {% if latest_data[data_type] %}
+                                    <div class="card mb-4">
+                                        <div class="card-header">最新数据</div>
+                                        <div class="card-body">
+                                            <p><strong>时间: {{ latest_data[data_type]['timestamp'] }}</strong></p>
+                                            {% if latest_data[data_type]['price_items'] %}
+                                                <div class="table-responsive">
+                                                    <table class="table table-sm">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>价格比例</th>
+                                                                <th>原始比例</th>
+                                                                <th>订单数量</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for item in latest_data[data_type]['price_items'] %}
+                                                                <tr>
+                                                                    <td>{{ "%.2f" | format(item['ratio']) }}</td>
+                                                                    <td>{{ item['raw_ratio'] }}</td>
+                                                                    <td>{{ item['count'] }}</td>
+                                                                </tr>
+                                                            {% endfor %}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            {% else %}
+                                                <div class="row">
+                                                    <div class="col-md-4">
+                                                        <p>价格比例: <span class="latest-price">{{ "%.2f" | format(latest_data[data_type]['ratio']) }}</span></p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p>原始比例: <span class="latest-price">-</span></p>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <p>订单数量: <span class="latest-count">{{ latest_data[data_type]['count'] }}</span></p>
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                
+                                <!-- 历史数据表格 -->
+                                {% if all_data[data_type] %}
+                                    <div class="card">
+                                        <div class="card-header">历史数据</div>
+                                        <div class="card-body">
+                                            <div class="table-responsive">
+                                                <table class="table table-striped data-table">
+                                                    <thead>
+                                                            <tr>
+                                                                <th>时间</th>
+                                                                <th>价格比例</th>
+                                                                <th>原始比例</th>
+                                                                <th>订单数量</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {% for entry in all_data[data_type] %}
+                                                                {% if entry['price_items'] %}
+                                                                    {% for idx, item in entry['price_items']|enumerate %}
+                                                                        <tr>
+                                                                            {% if idx == 0 %}
+                                                                                <td rowspan="{{ entry['price_items'] | length }}">{{ entry['timestamp'] }}</td>
+                                                                            {% endif %}
+                                                                            <td>{{ "%.2f" | format(item['ratio']) }}</td>
+                                                                            <td>{{ item['raw_ratio'] }}</td>
+                                                                            <td>{{ item['count'] }}</td>
+                                                                        </tr>
+                                                                    {% endfor %}
+                                                            {% else %}
+                                                                <tr>
+                                                                    <td>{{ entry['timestamp'] }}</td>
+                                                                    <td>{{ "%.2f" | format(entry['ratio']) }}</td>
+                                                                    <td>-</td>
+                                                                    <td>{{ entry['count'] }}</td>
+                                                                </tr>
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <div class="card">
+                                        <div class="card-body no-data">
+                                            <p>暂无数据</p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="no-data">
+                        <h3>暂无数据</h3>
+                        <p>该物品还没有价格数据。</p>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="card-footer timestamp">
+                最后更新: {{ datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') }}
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 自动刷新页面
+        setInterval(function() {
+            location.reload();
+        }, 60000); // 每分钟刷新一次
+        
+        // 截图切换功能
+        document.querySelectorAll('[id$="-screenshot-select"]').forEach(select => {
+            select.addEventListener('change', function() {
+                const dataType = this.id.split('-screenshot-select')[0];
+                const timestamp = this.value;
+                const itemName = "{{ item_name }}";
+                const imageElement = document.getElementById(`${dataType}-screenshot-image`);
+                
+                // 显示加载状态
+                const originalSrc = imageElement.src;
+                imageElement.style.opacity = '0.5';
+                
+                // 发送请求获取指定时间戳的截图
+                fetch(`/api/screenshot/${encodeURIComponent(itemName)}/${encodeURIComponent(dataType)}/${encodeURIComponent(timestamp)}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('网络响应错误');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.image) {
+                            imageElement.src = `data:image/png;base64,${data.image}`;
+                            imageElement.alt = `截图 - ${timestamp}`;
+                        } else {
+                            console.error('未找到截图数据');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('加载截图失败:', error);
+                        alert('加载截图失败，请稍后重试');
+                    })
+                    .finally(() => {
+                        // 恢复显示
+                        imageElement.style.opacity = '1';
+                    });
+            });
+        });
+        
+        // 空数据预警时间戳点击事件
+        document.querySelectorAll('.view-empty-screenshot').forEach(button => {
+            button.addEventListener('click', function() {
+                const dataType = this.getAttribute('data-data-type');
+                const timestamp = this.getAttribute('data-timestamp');
+                const itemName = "{{ item_name }}";
+                
+                // 切换到对应的标签页
+                const tabElement = document.getElementById(dataType);
+                const tabLink = document.querySelector(`[href="#${dataType}"]`);
+                
+                if (tabElement && tabLink) {
+                    // 激活对应的标签页
+                    const tabInstance = new bootstrap.Tab(tabLink);
+                    tabInstance.show();
+                    
+                    // 延迟一下，确保标签页已经显示
+                    setTimeout(() => {
+                        // 获取对应的下拉选择器和图片元素
+                        const selectElement = document.getElementById(`${dataType}-screenshot-select`);
+                        const imageElement = document.getElementById(`${dataType}-screenshot-image`);
+                        
+                        if (selectElement && imageElement) {
+                            // 设置下拉选择器的值
+                            selectElement.value = timestamp;
+                            
+                            // 显示加载状态
+                            imageElement.style.opacity = '0.5';
+                            
+                            // 发送请求获取指定时间戳的截图
+                            fetch(`/api/screenshot/${encodeURIComponent(itemName)}/${encodeURIComponent(dataType)}/${encodeURIComponent(timestamp)}`)
+                                .then(response => {
+                                    if (!response.ok) {
+                                        throw new Error('网络响应错误');
+                                    }
+                                    return response.json();
+                                })
+                                .then(data => {
+                                    if (data.image) {
+                                        imageElement.src = `data:image/png;base64,${data.image}`;
+                                        imageElement.alt = `截图 - ${timestamp}`;
+                                    } else {
+                                        alert('未找到该时间点的截图');
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('加载截图失败:', error);
+                                    alert('加载截图失败，请稍后重试');
+                                })
+                                .finally(() => {
+                                    // 恢复显示
+                                    imageElement.style.opacity = '1';
+                                });
+                        }
+                    }, 100);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

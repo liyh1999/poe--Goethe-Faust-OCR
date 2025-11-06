@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Flask
+instance/
+web_app.cfg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Virtual Environments
+venv/
+env/
+ENV/
+envs/
+pyvenv.cfg
+
+# Logs
+*.log
+logs/
+
+# Testing
+*.pytest_cache/
+.pytest_cache/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Market price statistics (可选，如需上传数据则注释掉)
+# Market price statistics/
+
+# 隐藏文件
+.*
+!.gitignore
+!.gitattributes
